@@ -1,0 +1,132 @@
+{
+  "id": "camofox-browser",
+  "name": "Camofox Browser",
+  "description": "Anti-detection browser automation for AI agents using Camoufox (Firefox-based)",
+  "version": "1.18.1",
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Camoufox browser server URL"
+      },
+      "port": {
+        "type": "number",
+        "description": "Server port (used if url not set)",
+        "default": 9377
+      },
+      "autoStart": {
+        "type": "boolean",
+        "description": "Auto-start the camofox-browser server with the Gateway",
+        "default": true
+      },
+      "maxSessions": {
+        "type": "number",
+        "description": "Maximum concurrent browser sessions (server default: 50)",
+        "default": 5
+      },
+      "maxTabsPerSession": {
+        "type": "number",
+        "description": "Maximum tabs per session (server default: 10)",
+        "default": 3
+      },
+      "sessionTimeoutMs": {
+        "type": "number",
+        "description": "Session inactivity timeout in milliseconds (server default: 1800000)",
+        "default": 600000
+      },
+      "browserIdleTimeoutMs": {
+        "type": "number",
+        "description": "Kill browser after this many ms with no sessions (0 = never)",
+        "default": 300000
+      },
+      "maxOldSpaceSize": {
+        "type": "number",
+        "description": "Node.js V8 heap limit in MB",
+        "default": 128
+      },
+      "apiKey": {
+        "type": "string",
+        "description": "Secret key for cookie import endpoint. Cookie import is disabled if unset. Set via CAMOFOX_API_KEY env var."
+      },
+      "accessKey": {
+        "type": "string",
+        "description": "If set, all routes (except /health) require Authorization: Bearer <key>. Set via CAMOFOX_ACCESS_KEY env var."
+      },
+      "crashReportEnabled": {
+        "type": "boolean",
+        "description": "Enable anonymized crash/hang telemetry. Set false to disable all outbound telemetry.",
+        "default": true
+      },
+      "crashReportUrl": {
+        "type": "string",
+        "description": "Telemetry endpoint URL. Override to point to a self-hosted endpoint. Set via CAMOFOX_CRASH_REPORT_URL env var.",
+        "default": "https://camofox-telemetry.askjo.workers.dev/report"
+      }
+    },
+    "additionalProperties": false
+  },
+  "uiHints": {
+    "url": {
+      "label": "Server URL",
+      "placeholder": "http://localhost:9377"
+    },
+    "port": {
+      "label": "Server Port",
+      "placeholder": "9377"
+    },
+    "autoStart": {
+      "label": "Auto-start server with Gateway"
+    },
+    "maxSessions": {
+      "label": "Max Sessions",
+      "placeholder": "5"
+    },
+    "maxTabsPerSession": {
+      "label": "Max Tabs per Session",
+      "placeholder": "3"
+    },
+    "sessionTimeoutMs": {
+      "label": "Session Timeout (ms)",
+      "placeholder": "600000"
+    },
+    "browserIdleTimeoutMs": {
+      "label": "Browser Idle Timeout (ms)",
+      "placeholder": "300000"
+    },
+    "maxOldSpaceSize": {
+      "label": "Node Heap Limit (MB)",
+      "placeholder": "128"
+    },
+    "apiKey": {
+      "label": "Cookie Import API Key (CAMOFOX_API_KEY)",
+      "placeholder": "Leave empty to disable cookie import"
+    },
+    "accessKey": {
+      "label": "Global Access Key (CAMOFOX_ACCESS_KEY)",
+      "placeholder": "Leave empty for localhost-only access"
+    },
+    "crashReportEnabled": {
+      "label": "Enable Telemetry"
+    },
+    "crashReportUrl": {
+      "label": "Telemetry Endpoint URL",
+      "placeholder": "https://camofox-telemetry.askjo.workers.dev/report"
+    }
+  },
+  "contracts": {
+    "tools": [
+      "camofox_create_tab",
+      "camofox_snapshot",
+      "camofox_click",
+      "camofox_type",
+      "camofox_navigate",
+      "camofox_scroll",
+      "camofox_screenshot",
+      "camofox_close_tab",
+      "camofox_evaluate",
+      "camofox_list_tabs",
+      "camofox_import_cookies"
+    ]
+  }
+}

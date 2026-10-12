@@ -1,0 +1,103 @@
+# CI/CD Dockerfile — downloads binaries during build (no bind mounts needed).
+# For local builds with pre-downloaded binaries, use the default Dockerfile + Makefile.
+
+FROM node:22-trixie-slim
+
+ARG CAMOUFOX_VERSION=152.0.4
+ARG CAMOUFOX_RELEASE=beta.28
+ARG TARGETARCH
+ARG YT_DLP_VERSION=2026.08.19
+ARG YT_DLP_SHA256_AMD64=58162f9bfdc27458ea47bfcb311cf47028f17d8154a8bf7d689861d46399230a
+ARG YT_DLP_SHA256_ARM64=b16e4dab368a816cd05d477d698a605a6ae87ccee1c8ffd38fa21d7254141fcc
+
+# Install dependencies for Camoufox (Firefox-based)
+RUN apt-get update && apt-get install -y \
+    # Firefox dependencies
+    libgtk-3-0 \
+    libdbus-glib-1-2 \
+    libxt6 \
+    libasound2 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxi6 \
+    libxrandr2 \
+    libxrender1 \
+    libxss1 \
+    libxtst6 \
+    # Mesa OpenGL/EGL for WebGL support (software rendering via llvmpipe)
+    # `libegl1-mesa` was dropped in Debian trixie.
+    libegl1 \
+    libgl1-mesa-dri \
+    libgbm1 \
+    # Xvfb virtual display
+    xvfb \
+    # Fonts
+    fonts-liberation \
+    fonts-noto-color-emoji \
+    fontconfig \
+    # Utils
+    ca-certificates \
+    curl \
+    unzip \
+    # Native-module build tools. better-sqlite3 may compile from source on arm64.
+    build-essential \
+    python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download and install Camoufox
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) CAMOUFOX_ARCH="x86_64" ;; \
+      arm64) CAMOUFOX_ARCH="arm64" ;; \
+      *) echo "Unsupported arch: ${TARGETARCH}" && exit 1 ;; \
+    esac; \
+    mkdir -p /root/.cache/camoufox; \
+    curl -fSL "https://github.com/daijro/camoufox/releases/download/v${CAMOUFOX_VERSION}-${CAMOUFOX_RELEASE}/camoufox-${CAMOUFOX_VERSION}-${CAMOUFOX_RELEASE}-lin.${CAMOUFOX_ARCH}.zip" \
+      -o /tmp/camoufox.zip; \
+    (unzip -q /tmp/camoufox.zip -d /root/.cache/camoufox || true); \
+    chmod -R 755 /root/.cache/camoufox; \
+    echo "{\"version\":\"${CAMOUFOX_VERSION}\",\"release\":\"${CAMOUFOX_RELEASE}\"}" > /root/.cache/camoufox/version.json; \
+    test -f /root/.cache/camoufox/camoufox-bin && echo "Camoufox installed successfully"; \
+    rm /tmp/camoufox.zip
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+# npm ci runs the postinstall hook, which needs postinstall.js and its one lib/ import.
+COPY postinstall.js ./
+COPY lib/camoufox-download.js ./lib/
+COPY scripts/ ./scripts/
+# Build tools are needed when better-sqlite3 has no native prebuild for the target.
+# Trixie's glibc also supports the upstream arm64 prebuild at runtime.
+RUN npm ci --omit=dev \
+    && apt-get purge -y --auto-remove build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY server.js ./
+COPY camofox.config.json ./
+COPY lib/ ./lib/
+# lib/cookies.js re-exports mcp/lib/cookies.mjs for persistence support.
+COPY mcp/ ./mcp/
+COPY plugins/ ./plugins/
+COPY scripts/ ./scripts/
+
+# Install default plugin dependencies. yt-dlp is pinned per target architecture
+# and verified by the YouTube plugin hook.
+# Note: sh is used explicitly (./scripts/) because COPY from Windows
+# does not preserve +x permission bits in Docker build contexts.
+RUN case "${TARGETARCH}" in \
+      amd64) export YT_DLP_ASSET=yt-dlp_linux YT_DLP_SHA256="${YT_DLP_SHA256_AMD64}" ;; \
+      arm64) export YT_DLP_ASSET=yt-dlp_linux_aarch64 YT_DLP_SHA256="${YT_DLP_SHA256_ARM64}" ;; \
+      *) echo "Unsupported arch: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    sh scripts/install-plugin-deps.sh
+
+ENV NODE_ENV=production
+ENV CAMOFOX_PORT=9377
+
+EXPOSE 9377
+
+CMD ["sh", "-c", "node --max-old-space-size=${MAX_OLD_SPACE_SIZE:-128} server.js"]

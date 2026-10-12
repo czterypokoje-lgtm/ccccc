@@ -1,0 +1,32 @@
+# Camofox behind a proxy kill-switch.
+#
+#   docker compose -f docker-compose.proxy.yml up --build
+#
+# Reads the proxy from .env (same vars the server already uses).
+# The container cannot reach anything except the proxy -- see docker/killswitch.sh.
+services:
+  camofox:
+    build:
+      context: .
+      target: killswitch
+    env_file: .env
+    environment:
+      CAMOFOX_PORT: 9377
+      # Bind on all interfaces INSIDE the container; iptables is what limits
+      # who may connect, not the bind address.
+      CAMOFOX_BIND_HOST: 0.0.0.0
+    cap_add:
+      - NET_ADMIN        # required to write iptables rules
+    sysctls:
+      # Belt and braces: even if ip6tables is missing, no v6 address exists.
+      net.ipv6.conf.all.disable_ipv6: "1"
+      net.ipv6.conf.default.disable_ipv6: "1"
+    ports:
+      - "127.0.0.1:9377:9377"   # localhost only; do not expose this to the internet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:9377/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
